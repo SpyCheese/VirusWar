@@ -1,0 +1,50 @@
+name:                VirusWar
+version:             0.1.0.0
+github:              "SpyCheese/VirusWar"
+author:              "Mikhail Putilin"
+maintainer:          "Mikhail Putilin"
+
+extra-source-files:
+- README.md
+
+description:         Client-server implementation of a board game "Virus Var"
+
+dependencies:
+- base >= 4.7 && < 5
+- mtl
+- transformers
+- vector
+- microlens-platform
+- aeson
+- text
+- bytestring
+- network
+- monad-loops
+- sdl2
+- sdl2-gfx
+- sdl2-ttf
+- file-embed
+
+library:
+  source-dirs: common
+
+executables:
+  VirusWar-server-exe:
+    main:                Main.hs
+    source-dirs:         server
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - VirusWar
+  VirusWar-client-exe:
+    main:                Main.hs
+    source-dirs:         client
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - VirusWar
+

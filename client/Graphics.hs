@@ -153,8 +153,8 @@ startGraphics initialGame gameRef turnVar me =
       min (650 `div` (V.length $ initialGame ^. gameField))
           (800 `div` (V.length $ V.head $ initialGame ^. gameField))
     cellRadius = (cellSize - 6) `div` 2
-    innerRadius = cellRadius - 4
-    markRadius = 4
+    innerRadius = cellRadius - min 4 (cellSize `div` 10)
+    markRadius = 3
     separatorWidth = 15
 
     infoWidth, infoHeight, infoCellRadius, infoCellInner, infoCellX :: Integral a => a
@@ -188,7 +188,7 @@ playerColor = V.fromList [
     color 255 0 255,
     color 255 255 0,
     color 255 128 0,
-    color 252 15 192,
+    color 254 185 234,
     color 180 180 180,
     color 90 0 157
   ]

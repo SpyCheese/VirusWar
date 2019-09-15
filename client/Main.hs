@@ -10,6 +10,7 @@ import Data.Aeson
 import Data.Aeson.Types
 import Data.IORef
 import Data.Maybe (fromJust)
+import Data.Vector (Vector, (!))
 import qualified Data.Vector as V
 import GHC.IO (finally)
 import Lens.Micro.Platform ((^.))
@@ -25,15 +26,15 @@ import Graphics
 import SocketUtils
 
 printUsage :: IO a
-printUsage = die "Usage: ./VirusWar-client-exe host port"
+printUsage = die "Usage: ./VirusWar-client-exe host port name"
 
 main :: IO ()
 main = withSocketsDo $ do
   argv <- getArgs
-  when (length argv /= 2) printUsage
+  when (length argv /= 3) printUsage
   sock <- createSocket (head argv) (argv !! 1)
   mySock <- mySocket sock
-  finally (runClient mySock) (close sock)
+  finally (runClient mySock (argv !! 2)) (myClose mySock)
   return ()
 
 createSocket :: HostName -> ServiceName -> IO Socket
@@ -44,19 +45,26 @@ createSocket host port = do
   connect sock $ addrAddress addr
   return sock
 
-runClient :: MySocket -> IO ()
-runClient sock = do
-  initialGame <- (recvJSON sock :: IO (Maybe Game)) >>= \case
+runClient :: MySocket -> String -> IO ()
+runClient sock myName = do
+  unless (isValidPlayerName myName) $
+    die "Player name should be not empty and not longer than 12 characters"
+  sendJSON myName sock
+
+  initialGame <- recvJSON sock >>= \case
     Nothing -> die ""
     Just g -> return g
-  me <- (recvJSON sock :: IO (Maybe Player)) >>= \case
+  me <- recvJSON sock >>= \case
     Nothing -> die ""
-    Just g -> return g
+    Just m -> return m
+  ratingInfo <- recvJSON sock >>= \case
+    Nothing -> die ""
+    Just r -> return r
 
   gameRef <- newIORef initialGame
   turnVar <- newEmptyMVar
   thread <- forkOS $ void $ runThread sock gameRef turnVar me initialGame
-  startGraphics initialGame gameRef turnVar me
+  startGraphics initialGame gameRef turnVar me ratingInfo
   return ()
 
 runThread :: MySocket -> IORef Game -> MVar Turn -> Player -> Game -> IO (Game)

@@ -7,8 +7,8 @@ Ubuntu:
 `sudo apt install libsdl2-dev libsdl2-gfx-dev libsdl2-ttf-dev`
 
 ## Usage
-* Server: `VirusWar-server-exe config.json`
-* Client: `VirusWar-client-exe host port`
+* Server: `VirusWar-server-exe config.json database.sqlite`
+* Client: `VirusWar-client-exe host port name`
 
 ## Rules
 * The field is a rectangular grid. Two cells are neighbours if they share a side.

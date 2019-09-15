@@ -13,12 +13,15 @@ module Game
   , PlayerInfo (PlayerInfo)
   , isPlayerActive
   , Game (Game)
-  , gamePlayers, gameField, gameCurrentTurn, gameSubTurnCount
+  , gameName, gamePlayers, gameField, gameCurrentTurn, gameSubTurnCount
+  , PlayerRatingInfo (PlayerRatingInfo)
+  , prName, prGames, prWins
+  , isValidPlayerName
   ) where
 
 import Control.Monad.State
 import Control.Monad (replicateM)
-import Data.Char (chr, ord)
+import Data.Char (chr, ord, isPrint, isSpace)
 import Data.Vector (Vector, (!))
 import qualified Data.Vector as V
 import Lens.Micro.Platform
@@ -68,11 +71,23 @@ newtype PlayerInfo = PlayerInfo
     }
 
 data Game = Game
-  { _gamePlayers :: Vector PlayerInfo
+  { _gameName :: String
+  , _gamePlayers :: Vector PlayerInfo
   , _gameField :: Field
   , _gameCurrentTurn :: CurrentTurnInfo
   , _gameSubTurnCount :: Int
   }
 
+data PlayerRatingInfo = PlayerRatingInfo
+  { _prName :: String
+  , _prGames :: Int
+  , _prWins :: Int
+  }
+
 makeLenses ''Game
 makeLenses ''PlayerInfo
+makeLenses ''PlayerRatingInfo
+
+isValidPlayerName :: String -> Bool
+isValidPlayerName s =
+  not (null s) && length s <= 12 && all isPrint s && not (all isSpace s)

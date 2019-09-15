@@ -1,5 +1,6 @@
 {
   "game": {
+    "name": "1v1",
     "players": 2,
     "subturns": 3,
     "field": [

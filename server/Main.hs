@@ -8,11 +8,14 @@ import Control.Monad.State
 import Data.Aeson
 import Data.Aeson.Types (emptyObject)
 import Data.Functor ((<&>))
+import Data.IORef
 import Data.List (intercalate)
 import Data.Text (pack)
 import Data.Vector (Vector, (!))
 import qualified Data.Vector as V
 import qualified Data.ByteString.Lazy as BS
+import Database
+import qualified Database.SQLite.Simple as SQL
 import GHC.IO
 import Lens.Micro.Platform ((^.))
 import Network.Socket
@@ -31,9 +34,9 @@ import Utils
 main :: IO ()
 main = do
   argv <- getArgs
-  if length argv /= 1
-    then die "Usage: ./VirusVar-server-exe config_file.json"
-    else mainWithConfigFile $ head argv
+  if length argv /= 2
+    then die "Usage: ./VirusVar-server-exe config_file.json database.sqlite"
+    else withDatabase (argv !! 1) (mainWithArgs $ head argv)
 
 eitherParse :: FromJSON a => Value -> Either String a
 eitherParse = resultToEither . fromJSON
@@ -42,8 +45,8 @@ eitherParse = resultToEither . fromJSON
     resultToEither (Error x) = Left x
     resultToEither (Success x) = Right x
 
-mainWithConfigFile :: String -> IO ()
-mainWithConfigFile configFile = withSocketsDo $ do
+mainWithArgs :: String -> SQL.Connection -> IO ()
+mainWithArgs configFile conn = withSocketsDo $ do
   configContent <- tryIO (BS.readFile configFile) ("Failed to read " ++ configFile)
   config <- eitherDecode configContent `orDie` "Failed to parse config"
   let gameJson = config ^. initialGameJson
@@ -54,9 +57,26 @@ mainWithConfigFile configFile = withSocketsDo $ do
   putStrLn "Server started"
   print game
   putStrLn $ "Listening on ports " ++ intercalate ", " (V.toList (V.map show ports))
-  sockets <- (V.mapM createSocket ports >>= V.mapM accept) <&> V.map fst
-  mySockets <- V.mapM mySocket sockets
-  finally (runServer game gameJson mySockets) (V.forM sockets close)
+  namesRef <- newIORef []
+  mySockets <- V.mapM createSocket ports >>= V.mapM \sock -> do
+    names <- readIORef namesRef
+    (mySock, name) <- acceptPlayer names sock
+    writeIORef namesRef (name : names)
+    return mySock
+  names <- V.reverse . V.fromList <$> readIORef namesRef
+  finally (runServer conn game gameJson mySockets names) (V.forM mySockets myClose)
+
+acceptPlayer :: [String] -> Socket -> IO (MySocket, String)
+acceptPlayer prevNames sock = untilJust do
+  newSock <- fst <$> accept sock
+  mySock <- mySocket newSock
+  recvJSON mySock >>= \case
+    Nothing -> return Nothing
+    Just name -> if isValidPlayerName name && not (elem name prevNames)
+      then return $ Just (mySock, name)
+      else do
+        myClose mySock
+        return Nothing
 
 createSocket :: PortNumber -> IO Socket
 createSocket port = do
@@ -71,17 +91,29 @@ createSocket port = do
   listen sock 1
   return sock
 
-runServer :: Game -> Value -> Vector MySocket -> IO ()
-runServer initialGame initialGameJson sockets = do
+runServer :: SQL.Connection -> Game -> Value -> Vector MySocket -> Vector String -> IO ()
+runServer conn initialGame initialGameJson sockets playerNames = do
   putStrLn "Players connected"
+  dbPlayersInfo <- V.mapM (dbGetPlayer conn) playerNames
+  let ratingInfo = V.map snd dbPlayersInfo
+  let dbPlayerIds = V.map fst dbPlayersInfo
+  dbGameId <- dbAddGame conn (initialGame ^. gameName) initialGameJson dbPlayerIds
+  putStrLn $ "Game id = " ++ show dbGameId
+  V.forM ratingInfo print
   V.forM (V.indexed sockets) \(i, sock) -> do
     sendJSON initialGameJson sock
     sendJSON (Player i) sock
-  iterateUntilM (\g -> isGameOver $ g ^. gameCurrentTurn) runStep initialGame
-  return ()
+    sendJSON ratingInfo sock
+  turnIndexRef <- newIORef 0
+  endGame <- iterateUntilM (\g -> isGameOver $ g ^. gameCurrentTurn)
+    (runStep dbGameId turnIndexRef) initialGame
+
+  let scores = V.generate (length playerNames) \pi -> playerScore (Player pi) (endGame ^. gameField)
+  dbFinishGame conn dbGameId dbPlayerIds scores ratingInfo
+
   where
-    runStep :: Game -> IO Game
-    runStep game = do
+    runStep :: Int -> IORef Int -> Game -> IO Game
+    runStep dbGameId turnIndexRef game = do
       putStrLn ""
       print game
       (p, remaining) <- case game ^. gameCurrentTurn of
@@ -99,6 +131,9 @@ runServer initialGame initialGameJson sockets = do
           return game
         Right newGame -> do
           putStrLn "OK"
+          turnIndex <- readIORef turnIndexRef
+          writeIORef turnIndexRef (turnIndex + 1)
+          dbAddTurn conn turnIndex dbGameId (unPlayer p) turn
           sendJSON emptyObject sock
           V.forM_ (V.ifilter (\i _ -> i /= unPlayer p) sockets) $ sendJSON turn
           return newGame

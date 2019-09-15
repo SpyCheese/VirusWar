@@ -24,6 +24,7 @@ dependencies:
 - sdl2-gfx
 - sdl2-ttf
 - file-embed
+- sqlite-simple
 
 library:
   source-dirs: common

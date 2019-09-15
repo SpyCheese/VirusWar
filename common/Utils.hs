@@ -4,6 +4,7 @@ module Utils
  ( takeIf
  , tryIO
  , orDie
+ , fixedLength
  ) where
 
 import Control.Exception
@@ -25,3 +26,9 @@ tryIO f s = catch f (\a@IOError {} -> die $ s ++ ": " ++ displayException a)
 orDie :: Either String a -> String -> IO a
 orDie (Left msg) s = die $ s ++ ": " ++ msg
 orDie (Right x) _ = return x
+
+fixedLength :: Int -> String -> String
+fixedLength len s = let slen = length s
+                    in if slen >= len
+                      then drop (slen - len) s
+                      else replicate (len - length s) ' ' ++ s

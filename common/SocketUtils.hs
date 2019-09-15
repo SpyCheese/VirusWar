@@ -4,6 +4,7 @@ module SocketUtils
  , mySocket
  , sendJSON
  , recvJSON
+ , myClose
  ) where
 
 import Control.Exception (catch)
@@ -33,3 +34,6 @@ recvJSON (MySocket _ ref) =
     x : xs -> do
       writeIORef ref xs
       return $ decode x
+
+myClose :: MySocket -> IO ()
+myClose (MySocket sock _) = close sock

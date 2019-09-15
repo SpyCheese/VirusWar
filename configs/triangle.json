@@ -1,5 +1,6 @@
 {
   "game": {
+    "name": "Triangle",
     "players": 3,
     "subturns": 3,
     "field": [

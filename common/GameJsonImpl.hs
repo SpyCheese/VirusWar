@@ -48,13 +48,30 @@ instance FromJSON Turn where
   parseJSON _ = fail "Array or \"finish\" expected"
 
 
+instance ToJSON PlayerRatingInfo where
+  toJSON :: PlayerRatingInfo -> Value
+  toJSON (PlayerRatingInfo name games wins) = object
+    [ pack "name" .= name
+    , pack "games" .= games
+    , pack "wins" .= wins ]
+
+instance FromJSON PlayerRatingInfo where
+  parseJSON :: Value -> Parser PlayerRatingInfo
+  parseJSON (Object v) = PlayerRatingInfo
+    <$> v .: pack "name"
+    <*> v .: pack "games"
+    <*> v .: pack "wins"
+  parseJSON _ = fail "Object expected"
+
+
 instance FromJSON Game where
   parseJSON :: Value -> Parser Game
   parseJSON (Object v) = do
+    name <- v .: pack "name"
     nPlayers <- v .: pack "players" >>= takeIf (\x -> 2 <= x && x <= 10) "Number of players should be in 2..10"
     field <- v .: pack "field" >>= parseField nPlayers
     t <- v .: pack "subturns" >>= takeIf (> 0) "Subturns must be > 0"
-    return $ Game (V.replicate nPlayers $ PlayerInfo True) field (CurrentTurn (Player 0) t) t
+    return $ Game name (V.replicate nPlayers $ PlayerInfo True) field (CurrentTurn (Player 0) t) t
     where
       parseField :: Int -> Vector String -> Parser Field
       parseField n ss = do

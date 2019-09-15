@@ -3,3 +3,4 @@
 VirusWar.cabal
 out
 *~
+*.sqlite

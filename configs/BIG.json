@@ -1,5 +1,6 @@
 {
   "game": {
+    "name": "BIG",
     "players": 10,
     "subturns": 3,
     "field": [

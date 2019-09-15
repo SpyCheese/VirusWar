@@ -9,6 +9,7 @@ import Lens.Micro.Platform
 
 import Game
 import Gameplay (playerScore)
+import Utils
 
 
 instance Show Player where
@@ -45,12 +46,6 @@ showField f = firstRow (length $ V.head f) ++ concat (imap showRow f)
     rowNameLen :: Int
     rowNameLen = length $ rowToString (length f - 1)
 
-    fixedLength :: Int -> String -> String
-    fixedLength len s = let slen = length s
-                        in if slen >= len
-                          then drop (slen - len) s
-                          else replicate (len - length s) ' ' ++ s
-
     firstRow :: Int -> String
     firstRow len = replicate (rowNameLen + 3) ' ' ++
                    unwords (fmap (fixedLength 3 . show) [1 .. len]) ++ "\n"
@@ -75,6 +70,14 @@ instance Show CurrentTurnInfo where
 instance Show PlayerInfo where
   show :: PlayerInfo -> String
   show p = if p ^. isPlayerActive then "ACTIVE" else "inactive"
+
+
+instance Show PlayerRatingInfo where
+  show :: PlayerRatingInfo -> String
+  show (PlayerRatingInfo name games wins) =
+    "Player " ++ name ++ ", " ++
+    show games ++ " games, " ++
+    show wins ++ " wins"
 
 
 instance Show Game where

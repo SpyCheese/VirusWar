@@ -1,5 +1,6 @@
 {
   "game": {
+    "name": "Pentagon",
     "players": 5,
     "subturns": 3,
     "field": [

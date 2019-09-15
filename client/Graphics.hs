@@ -27,13 +27,14 @@ import Game
 import Gameplay
 import SDLUtils
 import ShowGame
+import Utils
 
-startGraphics :: Game -> IORef Game -> MVar Turn -> Player -> IO ()
-startGraphics initialGame gameRef turnVar me =
+startGraphics :: Game -> IORef Game -> MVar Turn -> Player -> Vector PlayerRatingInfo -> IO ()
+startGraphics initialGame gameRef turnVar me ratingInfo =
   withSDL $ withTTF $
-  withWindow "Virus war" windowSize \window ->
+  withWindow ("Virus war: " ++ initialGame ^. gameName) windowSize \window ->
   withRenderer window \renderer -> do
-    font <- TTF.decode $(embedFile "resources/DejaVuSansMono.ttf") infoScoreHeight
+    font <- TTF.decode $(embedFile "resources/DejaVuSansMono.ttf") infoTextHeight
     mainLoop gameRef turnVar me renderer font
   where
     mainLoop :: IORef Game -> MVar Turn -> Player -> SDL.Renderer -> TTF.Font -> IO ()
@@ -46,8 +47,8 @@ startGraphics initialGame gameRef turnVar me =
         else do
           SDL.rendererDrawColor renderer $= black
           SDL.clear renderer
-          drawField renderer game me
-          drawPlayers renderer game me font
+          drawField renderer game
+          drawPlayers renderer game font
           SDL.present renderer
           return False
 
@@ -65,8 +66,8 @@ startGraphics initialGame gameRef turnVar me =
             return False
       _ -> return False
 
-    drawField :: SDL.Renderer -> Game -> Player -> IO ()
-    drawField renderer game me = do
+    drawField :: SDL.Renderer -> Game -> IO ()
+    drawField renderer game = do
       let moves = getAvailableMoves game
       V.forM_ (V.indexed $ game ^. gameField) \(i, row) ->
         V.forM_ (V.indexed row) \(j, cell) ->
@@ -105,8 +106,8 @@ startGraphics initialGame gameRef turnVar me =
               else
                 SDL.fillCircle renderer c markRadius (playerColor ! pi `withAlpha` 70)
 
-    drawPlayers :: SDL.Renderer -> Game -> Player -> TTF.Font -> IO ()
-    drawPlayers renderer game me font = do
+    drawPlayers :: SDL.Renderer -> Game -> TTF.Font -> IO ()
+    drawPlayers renderer game font = do
       SDL.fillRectangle renderer (vec2 fieldX 0) (vec2 (fieldX + separatorWidth) fieldY) (playerColor ! unPlayer me)
       void $ V.generateM (V.length $ game ^. gamePlayers) drawPlayer
       where
@@ -132,9 +133,15 @@ startGraphics initialGame gameRef turnVar me =
               void $ V.generateM t \i -> do
                 let y = y0 + ((i * 2 + 1) * infoHeight) `div` (n * 2)
                 SDL.fillCircle renderer (vec2 (x0 + infoTurnsX) y) infoTurnsRadius col
-          let text = pack $ show (playerScore (Player pi) (game ^. gameField))
-          let textPos = (vec2 (x0 + infoTextX) (y0 + (infoHeight - infoScoreHeight) `div` 2))
-          drawText renderer font textPos text col
+
+          let PlayerRatingInfo name games wins = ratingInfo ! pi
+          let textScore = show $ playerScore (Player pi) (game ^. gameField)
+          let text1 = pack $ textScore ++ " " ++ name
+          drawText renderer font (vec2 (x0 + infoTextX) (y0 + infoTextY1)) text1 col
+
+          let text2 = pack $ show games ++ " games, " ++ show wins ++ " wins"
+          drawText renderer font (vec2 (x0 + infoTextX) (y0 + infoTextY2)) text2 col
+
           when (pi == unPlayer me) $
             SDL.fillRectangle renderer (vec2 x0 y0) (vec2 (x0 + infoWidth) (y0 + infoHeight)) $ col `withAlpha` 100
 
@@ -151,24 +158,26 @@ startGraphics initialGame gameRef turnVar me =
     separatorWidth, cellSize, cellRadius, innerRadius, markRadius :: Integral a => a
     cellSize = fromIntegral $
       min (650 `div` (V.length $ initialGame ^. gameField))
-          (800 `div` (V.length $ V.head $ initialGame ^. gameField))
+          (650 `div` (V.length $ V.head $ initialGame ^. gameField))
     cellRadius = (cellSize - 6) `div` 2
     innerRadius = cellRadius - min 4 (cellSize `div` 10)
     markRadius = 3
     separatorWidth = 15
 
     infoWidth, infoHeight, infoCellRadius, infoCellInner, infoCellX :: Integral a => a
-    infoWidth = 200
-    infoHeight = 66
-    infoCellRadius = 31
-    infoCellInner = 27
-    infoCellX = 61
+    infoWidth = 330
+    infoHeight = 70
+    infoCellRadius = 27
+    infoCellInner = 24
+    infoCellX = 57
 
-    infoTurnsX, infoTurnsRadius, infoScoreHeight, infoTextX :: Integral a => a
+    infoTurnsX, infoTurnsRadius, infoTextHeight, infoTextX, infoTextY1, infoTextY2 :: Integral a => a
     infoTurnsX = 15
     infoTurnsRadius = 4
-    infoScoreHeight = 40
-    infoTextX = 100
+    infoTextHeight = 22
+    infoTextX = 92
+    infoTextY1 = infoHeight `div` 4 - infoTextHeight `div` 2
+    infoTextY2 = 3 * infoHeight `div` 4 - infoTextHeight `div` 2
 
     windowSize :: (Int, Int)
     windowSize = let f = initialGame ^. gameField in
@@ -183,12 +192,12 @@ playerColor :: Vector SDL.Color
 playerColor = V.fromList [
     color 255 0 0,
     color 0 255 0,
-    color 0 0 255,
+    color 36 100 255,
+    color 181 54 218,
     color 0 255 255,
     color 255 0 255,
     color 255 255 0,
     color 255 128 0,
-    color 254 185 234,
     color 180 180 180,
     color 90 0 157
   ]
